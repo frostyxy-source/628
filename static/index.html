@@ -347,11 +347,11 @@
 
 <div class="ticker-wrapper">
   <div class="ticker-inner">
-    🚂 6:28 ZÓNÁZÓ · VÁC – DUNAKESZI – ÚJPEST-VÁROSKAPU – BUDAPEST NYUGATI &nbsp;&nbsp;&nbsp;
+    🚂 6:28 ZÓNÁZÓ · VÁC – BUDAPEST-NYUGATI PÁLYAUDVAR &nbsp;&nbsp;&nbsp;
     ★ MENETJEGY ÉRVÉNYESÍTÉSÉRŐL A FELSZÁLLÁS ELŐTT GONDOSKODJON ★ &nbsp;&nbsp;&nbsp;
     A VONAT ÉRKEZÉSI IDEJE NYUGATIN: 07:18 &nbsp;&nbsp;&nbsp;
     HELYJEGY NEM SZÜKSÉGES · 2. OSZTÁLY &nbsp;&nbsp;&nbsp;
-    🚂 6:28 ZÓNÁZÓ · VÁC – DUNAKESZI – ÚJPEST-VÁROSKAPU – BUDAPEST NYUGATI &nbsp;&nbsp;&nbsp;
+    🚂 6:28 ZÓNÁZÓ · VÁC – BUDAPEST-NYUGATI PÁLYAUDVAR &nbsp;&nbsp;&nbsp;
   </div>
 </div>
 
@@ -386,14 +386,7 @@
 <script>
 const STATIONS = [
   { name: "Vác" },
-  { name: "Verőce" },
-  { name: "Nagymaros-\nVisegrád" },
-  { name: "Zebegény" },
-  { name: "Szob" },
-  { name: "Szőny" },
-  { name: "Dunakeszi" },
-  { name: "Újpest-\nVároskapu" },
-  { name: "Nyugati" }
+  { name: "Nyugati\nPályaudvar" }
 ];
 
 // ── PIXEL TRAIN ──────────────────────────────────────────────────────────────
@@ -471,7 +464,7 @@ function updateCountdown() {
     h > 0 ? `${h}ó ${String(m).padStart(2,'0')}p` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   const depTime = new Date(); depTime.setHours(6, 28, 0, 0);
   const elapsed = (now - depTime) / 60000;
-  const times = [0,9,13,19,26,33,41,45,50];
+  const times = [0, 50];
   let idx = 0;
   if (elapsed > 0) times.forEach((t,i) => { if (elapsed >= t) idx = i; });
   if (idx !== currentStationIdx) {
@@ -489,10 +482,7 @@ let isThinking = false;
 let messageCount = 0;
 
 const STATION_INTERRUPTS = [
-  { after: 2, station: "Verőce", msg: "⚠ VERŐCE · Ajtók nyílnak. Tessék! ⚠" },
-  { after: 5, station: "Szob", msg: "⚠ SZOB · Menetjegy-ellenőrzés. Felkészülni. ⚠" },
-  { after: 8, station: "Dunakeszi", msg: "⚠ DUNAKESZI · Aki Dunakeszin száll le, készüljön. ⚠" },
-  { after: 11, station: "Újpest-Városkapu", msg: "⚠ ÚJPEST-VÁROSKAPU · Majdnem ott vagyunk. ⚠" },
+  { after: 6, station: "Budapest-Nyugati", msg: "⚠ BUDAPEST-NYUGATI · Végállomás. Mindenki leszáll. ⚠" },
 ];
 let interruptIdx = 0;
 
