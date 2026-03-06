@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6:28 Zónázó | Vác → Nyugati</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+
+  :root {
+    --bg: #0a0a1a;
+    --panel: #11112a;
+    --border: #2a2a5a;
+    --yellow: #f5c842;
+    --blue: #3a6bc9;
+    --red: #c93a3a;
+    --green: #3ac97a;
+    --gray: #6a6a9a;
+    --white: #e8e8f8;
+    --pixel: 4px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  header {
+    width: 100%;
+    max-width: 800px;
+    padding: 24px 16px 12px;
+    text-align: center;
+  }
+
+  .train-sprite {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+    animation: trainBob 2s steps(2) infinite;
+  }
+  @keyframes trainBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  h1 {
+    color: var(--yellow);
+    font-size: 18px;
+    letter-spacing: 2px;
+    text-shadow: 4px 4px 0 #8a6000, -2px -2px 0 #8a6000;
+    line-height: 1.4;
+  }
+  .subtitle {
+    color: var(--gray);
+    font-size: 7px;
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  .status-bar {
+    width: 100%;
+    max-width: 800px;
+    background: var(--panel);
+    border-top: var(--pixel) solid var(--yellow);
+    border-bottom: var(--pixel) solid var(--yellow);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .status-item { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .status-label { color: var(--gray); font-size: 6px; text-transform: uppercase; }
+  .status-value { color: var(--yellow); font-size: 11px; }
+  .status-value.green { color: var(--green); }
+  .status-value.blinking { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .ticker-wrapper {
+    width: 100%;
+    max-width: 800px;
+    background: #000;
+    border: var(--pixel) solid var(--yellow);
+    overflow: hidden;
+    height: 28px;
+    margin-bottom: 16px;
+  }
+  .ticker-inner {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    white-space: nowrap;
+    animation: tickerScroll 30s linear infinite;
+    color: var(--yellow);
+    font-size: 10px;
+    padding-left: 100%;
+  }
+  @keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+
+  .main {
+    width: 100%;
+    max-width: 800px;
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .chat-container {
+    background: var(--panel);
+    border: var(--pixel) solid var(--border);
+    box-shadow: var(--pixel) var(--pixel) 0 var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 420px;
+  }
+  .chat-titlebar {
+    background: var(--blue);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: var(--pixel) solid var(--border);
+  }
+  .chat-titlebar-dot {
+    width: 8px; height: 8px;
+    background: var(--yellow);
+    display: inline-block;
+    animation: blink 2s steps(1) infinite;
+  }
+  .chat-titlebar span { font-size: 8px; color: var(--white); }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .chat-messages::-webkit-scrollbar { width: 8px; }
+  .chat-messages::-webkit-scrollbar-track { background: var(--bg); }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border: 2px solid var(--bg); }
+
+  .message {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: msgAppear 0.2s steps(3) forwards;
+  }
+  @keyframes msgAppear { 0%{opacity:0;transform:translateY(4px)} 100%{opacity:1;transform:translateY(0)} }
+
+  .message.user { align-items: flex-end; }
+  .message.train { align-items: flex-start; }
+  .message.system { align-items: center; }
+
+  .message-sender { font-size: 6px; color: var(--gray); }
+
+  .message-bubble {
+    max-width: 75%;
+    padding: 8px 10px;
+    line-height: 1.8;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+  }
+  .message.user .message-bubble {
+    background: var(--blue);
+    border: var(--pixel) solid #5a8be9;
+    box-shadow: var(--pixel) var(--pixel) 0 #1a3a7a;
+    color: var(--white);
+  }
+  .message.train .message-bubble {
+    background: #1a1a0a;
+    border: var(--pixel) solid var(--yellow);
+    box-shadow: var(--pixel) var(--pixel) 0 #5a4800;
+    color: var(--yellow);
+  }
+  .message.system .message-bubble {
+    background: #1a0a0a;
+    border: var(--pixel) solid var(--red);
+    box-shadow: var(--pixel) var(--pixel) 0 #5a0000;
+    color: var(--red);
+    font-family: 'VT323', monospace;
+    font-size: 16px;
+    text-align: center;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .typing-indicator { display: none; align-items: flex-start; gap: 4px; padding: 0 12px 8px; }
+  .typing-indicator.visible { display: flex; }
+  .typing-dots {
+    background: #1a1a0a;
+    border: var(--pixel) solid var(--yellow);
+    padding: 6px 10px;
+    display: flex; gap: 4px; align-items: center;
+  }
+  .typing-dot {
+    width: 6px; height: 6px;
+    background: var(--yellow);
+    animation: dotPulse 0.8s steps(2) infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotPulse { 0%,100%{opacity:0.2} 50%{opacity:1} }
+
+  .chat-input-area {
+    border-top: var(--pixel) solid var(--border);
+    padding: 10px 12px;
+    display: flex; gap: 8px;
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--bg);
+    border: var(--pixel) solid var(--border);
+    color: var(--white);
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    padding: 6px 8px;
+    outline: none;
+    transition: border-color 0.1s;
+  }
+  .chat-input:focus { border-color: var(--yellow); }
+  .chat-input::placeholder { color: var(--gray); }
+
+  .send-btn {
+    background: var(--yellow);
+    border: none;
+    color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    box-shadow: var(--pixel) var(--pixel) 0 #8a6000;
+    transition: transform 0.1s;
+  }
+  .send-btn:hover { transform: translate(-1px,-1px); box-shadow: 6px 6px 0 #8a6000; }
+  .send-btn:active { transform: translate(4px,4px); box-shadow: none; }
+  .send-btn:disabled { background: var(--gray); cursor: not-allowed; box-shadow: none; transform: none; }
+
+  .station-map {
+    background: var(--panel);
+    border: var(--pixel) solid var(--border);
+    padding: 12px;
+    margin-bottom: 20px;
+  }
+  .station-map-title { color: var(--gray); font-size: 6px; margin-bottom: 10px; text-align: center; }
+  .stations {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    overflow-x: auto; gap: 0; padding-bottom: 4px;
+  }
+  .station-node { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+  .station-dot { width: 12px; height: 12px; border: var(--pixel) solid var(--gray); background: var(--bg); }
+  .station-dot.passed { background: var(--green); border-color: var(--green); }
+  .station-dot.current { background: var(--yellow); border-color: var(--yellow); animation: blink 0.8s steps(1) infinite; }
+  .station-line { flex: 1; height: var(--pixel); background: var(--gray); min-width: 16px; }
+  .station-line.passed { background: var(--green); }
+  .station-name { font-size: 5px; color: var(--gray); text-align: center; max-width: 50px; line-height: 1.4; transform: rotate(-15deg); margin-top: 4px; }
+  .station-name.current { color: var(--yellow); }
+  .station-name.passed { color: var(--green); }
+
+  footer { padding: 20px; color: var(--gray); font-size: 6px; text-align: center; }
+
+  .interrupt-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    font-family: 'Press Start 2P', monospace;
+    text-align: center; padding: 20px;
+  }
+  .interrupt-overlay.visible { display: flex; }
+  .interrupt-title { color: var(--yellow); font-size: 14px; text-shadow: 4px 4px 0 #8a6000; animation: blink 0.5s steps(1) infinite; }
+  .interrupt-sub { color: var(--white); font-size: 9px; line-height: 2; }
+  .interrupt-bar { width: 200px; height: 16px; border: var(--pixel) solid var(--yellow); background: var(--bg); overflow: hidden; }
+  .interrupt-bar-fill { height: 100%; background: var(--yellow); width: 0%; transition: width 0.1s linear; }
+
+  @media (max-width: 500px) {
+    h1 { font-size: 12px; }
+    .chat-container { height: 360px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="interrupt-overlay" id="interruptOverlay">
+  <div class="interrupt-title" id="interruptTitle">⚠ ÁLLOMÁS ⚠</div>
+  <div class="interrupt-sub" id="interruptSub"></div>
+  <div class="interrupt-bar"><div class="interrupt-bar-fill" id="interruptBarFill"></div></div>
+  <div style="color:var(--gray);font-size:6px" id="interruptTimer">4 mp</div>
+</div>
+
+<header>
+  <div class="train-sprite">
+    <canvas id="trainCanvas" width="192" height="64"></canvas>
+  </div>
+  <h1>6:28 ZÓNÁZÓ</h1>
+  <div class="subtitle">VÁC ➜ BUDAPEST-NYUGATI · 2. OSZTÁLY · CSAK ÜLVE</div>
+</header>
+
+<div class="status-bar">
+  <div class="status-item">
+    <span class="status-label">Indulás</span>
+    <span class="status-value">06:28</span>
+  </div>
+  <div class="status-item">
+    <span class="status-label">Következő indulás</span>
+    <span class="status-value blinking" id="countdown">--:--</span>
+  </div>
+  <div class="status-item">
+    <span class="status-label">Státusz</span>
+    <span class="status-value green">MENETREND SZERINT</span>
+  </div>
+  <div class="status-item">
+    <span class="status-label">Aktuális állomás</span>
+    <span class="status-value" id="currentStationDisplay">VÁC</span>
+  </div>
+</div>
+
+<div class="ticker-wrapper">
+  <div class="ticker-inner">
+    🚂 6:28 ZÓNÁZÓ · VÁC – DUNAKESZI – ÚJPEST-VÁROSKAPU – BUDAPEST NYUGATI &nbsp;&nbsp;&nbsp;
+    ★ MENETJEGY ÉRVÉNYESÍTÉSÉRŐL A FELSZÁLLÁS ELŐTT GONDOSKODJON ★ &nbsp;&nbsp;&nbsp;
+    A VONAT ÉRKEZÉSI IDEJE NYUGATIN: 07:18 &nbsp;&nbsp;&nbsp;
+    HELYJEGY NEM SZÜKSÉGES · 2. OSZTÁLY &nbsp;&nbsp;&nbsp;
+    🚂 6:28 ZÓNÁZÓ · VÁC – DUNAKESZI – ÚJPEST-VÁROSKAPU – BUDAPEST NYUGATI &nbsp;&nbsp;&nbsp;
+  </div>
+</div>
+
+<div class="main">
+  <div class="station-map">
+    <div class="station-map-title">▶ ÚTVONAL</div>
+    <div class="stations" id="stationMap"></div>
+  </div>
+
+  <div class="chat-container">
+    <div class="chat-titlebar">
+      <span class="chat-titlebar-dot"></span>
+      <span>CHAT // 6:28 ZÓNÁZÓ [ÉLŐBEN]</span>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="typing-dots">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Írj a vonatnak..." maxlength="200"/>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">KÜLD ▶</button>
+    </div>
+  </div>
+</div>
+
+<footer>★ 6:28 ZÓNÁZÓ · VÁC–NYUGATI · MÁV-START Zrt. · PixelRail™ v1.0 ★</footer>
+
+<script>
+const STATIONS = [
+  { name: "Vác" },
+  { name: "Verőce" },
+  { name: "Nagymaros-\nVisegrád" },
+  { name: "Zebegény" },
+  { name: "Szob" },
+  { name: "Szőny" },
+  { name: "Dunakeszi" },
+  { name: "Újpest-\nVároskapu" },
+  { name: "Nyugati" }
+];
+
+// ── PIXEL TRAIN ──────────────────────────────────────────────────────────────
+function drawTrain() {
+  const canvas = document.getElementById('trainCanvas');
+  const ctx = canvas.getContext('2d');
+  const P = 4;
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#f5c842';
+  ctx.fillRect(2*P, 7*P, 40*P, P);
+  ctx.fillStyle = '#3a6bc9';
+  ctx.fillRect(2*P, 8*P, 40*P, 4*P);
+  ctx.fillStyle = '#f5c842';
+  ctx.fillRect(2*P, 12*P, 40*P, P);
+  [[5,13],[12,13],[20,13],[28,13],[35,13]].forEach(([x,y]) => {
+    ctx.fillStyle = '#2a2a4a'; ctx.fillRect(x*P, y*P, 2*P, 2*P);
+    ctx.fillStyle = '#6a6aaa'; ctx.fillRect(x*P, y*P, P, P);
+  });
+  [[5,8],[9,8],[13,8],[17,8],[21,8],[25,8],[29,8],[33,8],[37,8]].forEach(([x,y]) => {
+    ctx.fillStyle = '#aadaff'; ctx.fillRect(x*P, y*P, 2*P, 2*P);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(x*P, y*P, P, P);
+  });
+  ctx.fillStyle = '#f5c842'; ctx.fillRect(0, 8*P, 2*P, 4*P);
+  ctx.fillStyle = '#c93a3a'; ctx.fillRect(0, 9*P, P, 2*P);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.font = `bold ${P*1.2}px monospace`;
+  ctx.fillText('6:28', 15*P, 11*P);
+  const t = Date.now() / 400;
+  [[2,5],[4,3],[6,5]].forEach(([ox,oy],i) => {
+    const alpha = 0.3 + 0.3 * Math.sin(t + i);
+    ctx.fillStyle = `rgba(200,200,230,${alpha})`;
+    ctx.fillRect((ox - Math.floor(t%3))*P, oy*P, P*2, P*2);
+  });
+}
+setInterval(drawTrain, 150);
+drawTrain();
+
+// ── STATIONS ─────────────────────────────────────────────────────────────────
+let currentStationIdx = 0;
+function buildStationMap() {
+  const container = document.getElementById('stationMap');
+  container.innerHTML = '';
+  STATIONS.forEach((s, i) => {
+    const node = document.createElement('div');
+    node.className = 'station-node';
+    const dot = document.createElement('div');
+    dot.className = 'station-dot' + (i < currentStationIdx ? ' passed' : i === currentStationIdx ? ' current' : '');
+    node.appendChild(dot);
+    const name = document.createElement('div');
+    name.className = 'station-name' + (i < currentStationIdx ? ' passed' : i === currentStationIdx ? ' current' : '');
+    name.textContent = s.name;
+    node.appendChild(name);
+    container.appendChild(node);
+    if (i < STATIONS.length - 1) {
+      const line = document.createElement('div');
+      line.className = 'station-line' + (i < currentStationIdx ? ' passed' : '');
+      container.appendChild(line);
+    }
+  });
+}
+buildStationMap();
+
+// ── COUNTDOWN ────────────────────────────────────────────────────────────────
+function updateCountdown() {
+  const now = new Date();
+  const next = new Date();
+  next.setHours(6, 28, 0, 0);
+  if (now > next) next.setDate(next.getDate() + 1);
+  const diff = next - now;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  document.getElementById('countdown').textContent =
+    h > 0 ? `${h}ó ${String(m).padStart(2,'0')}p` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const depTime = new Date(); depTime.setHours(6, 28, 0, 0);
+  const elapsed = (now - depTime) / 60000;
+  const times = [0,9,13,19,26,33,41,45,50];
+  let idx = 0;
+  if (elapsed > 0) times.forEach((t,i) => { if (elapsed >= t) idx = i; });
+  if (idx !== currentStationIdx) {
+    currentStationIdx = idx;
+    buildStationMap();
+    document.getElementById('currentStationDisplay').textContent = STATIONS[idx].name.replace('\n', '-');
+  }
+}
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
+// ── CHAT ─────────────────────────────────────────────────────────────────────
+const conversationHistory = [];
+let isThinking = false;
+let messageCount = 0;
+
+const STATION_INTERRUPTS = [
+  { after: 2, station: "Verőce", msg: "⚠ VERŐCE · Ajtók nyílnak. Tessék! ⚠" },
+  { after: 5, station: "Szob", msg: "⚠ SZOB · Menetjegy-ellenőrzés. Felkészülni. ⚠" },
+  { after: 8, station: "Dunakeszi", msg: "⚠ DUNAKESZI · Aki Dunakeszin száll le, készüljön. ⚠" },
+  { after: 11, station: "Újpest-Városkapu", msg: "⚠ ÚJPEST-VÁROSKAPU · Majdnem ott vagyunk. ⚠" },
+];
+let interruptIdx = 0;
+
+function triggerInterrupt(interrupt) {
+  const overlay = document.getElementById('interruptOverlay');
+  document.getElementById('interruptTitle').textContent = `⚠ ${interrupt.station.toUpperCase()} ⚠`;
+  document.getElementById('interruptSub').textContent = interrupt.msg;
+  overlay.classList.add('visible');
+  let pct = 0;
+  const fill = document.getElementById('interruptBarFill');
+  const timer = document.getElementById('interruptTimer');
+  fill.style.width = '0%';
+  const iv = setInterval(() => {
+    pct += 2;
+    fill.style.width = pct + '%';
+    timer.textContent = `${Math.max(0, 4 - Math.floor(pct/25))} mp`;
+    if (pct >= 100) {
+      clearInterval(iv);
+      overlay.classList.remove('visible');
+      addMessage('system', `[ ${interrupt.station} állomás · Ajtók zárva · Indulás ]`);
+    }
+  }, 80);
+}
+
+function addMessage(role, text) {
+  const container = document.getElementById('chatMessages');
+  const msg = document.createElement('div');
+  msg.className = `message ${role}`;
+  if (role !== 'system') {
+    const sender = document.createElement('div');
+    sender.className = 'message-sender';
+    sender.textContent = role === 'train' ? '🚂 6:28 ZÓNÁZÓ' : '👤 UTAS';
+    msg.appendChild(sender);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping(v) {
+  document.getElementById('typingIndicator').classList.toggle('visible', v);
+  document.getElementById('sendBtn').disabled = v;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || isThinking) return;
+  input.value = '';
+  isThinking = true;
+  messageCount++;
+  addMessage('user', text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  // Station interrupt check
+  const nextInterrupt = STATION_INTERRUPTS[interruptIdx];
+  if (nextInterrupt && messageCount >= nextInterrupt.after) {
+    interruptIdx++;
+    setTimeout(() => triggerInterrupt(nextInterrupt), 300);
+    await new Promise(r => setTimeout(r, 4800));
+  }
+
+  showTyping(true);
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: conversationHistory })
+    });
+    const data = await res.json();
+    const reply = data.reply || 'Khhh... zajos. Nem értettem.';
+    conversationHistory.push({ role: 'assistant', content: reply });
+    showTyping(false);
+    addMessage('train', reply);
+  } catch (e) {
+    showTyping(false);
+    addMessage('train', 'Khhk... alagút. Gyenge a jel. Majd Dunakeszin folytatjuk.');
+  }
+  isThinking = false;
+}
+
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+setTimeout(() => {
+  addMessage('train', 'Hm. Megint valaki a telefonját nyomkodja ahelyett hogy kifizetné a jegyét. Na, mit akarsz.');
+}, 800);
+</script>
+</body>
+</html>
