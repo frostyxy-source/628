@@ -99,6 +99,39 @@
   .status-value.blinking { animation: blink 1s steps(1) infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
+  .moment-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 10000;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+    text-align: center; padding: 20px;
+  }
+  .moment-overlay.visible { display: flex; }
+  .moment-title {
+    color: var(--yellow);
+    font-size: 20px;
+    line-height: 1.8;
+    text-shadow: 4px 4px 0 #8a6000, -2px -2px 0 #8a6000;
+    animation: momentPulse 0.6s steps(2) infinite;
+  }
+  @keyframes momentPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  .moment-sub { color: var(--white); font-size: 8px; line-height: 2.2; }
+  .moment-close {
+    background: var(--yellow);
+    border: none; color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; padding: 10px 16px;
+    cursor: pointer;
+    box-shadow: var(--pixel) var(--pixel) 0 #8a6000;
+    margin-top: 8px;
+  }
+  .moment-train { font-size: 40px; animation: trainBob 0.4s steps(2) infinite; }
+
   .ticker-wrapper {
     width: 100%;
     max-width: 800px;
@@ -312,6 +345,13 @@
 <body>
 
 <div class="interrupt-overlay" id="interruptOverlay">
+
+<div class="moment-overlay" id="momentOverlay">
+  <div class="moment-train">🚂</div>
+  <div class="moment-title">THIS IS THE<br>TIME OF MY LIFE</div>
+  <div class="moment-sub">06:28 · Vác → Budapest-Nyugati<br>A legenda elindul.</div>
+  <button class="moment-close" onclick="document.getElementById('momentOverlay').classList.remove('visible')">BESZÁLLÁS ▶</button>
+</div>
   <div class="interrupt-title" id="interruptTitle">⚠ ÁLLOMÁS ⚠</div>
   <div class="interrupt-sub" id="interruptSub"></div>
   <div class="interrupt-bar"><div class="interrupt-bar-fill" id="interruptBarFill"></div></div>
@@ -323,7 +363,7 @@
     <canvas id="trainCanvas" width="192" height="64"></canvas>
   </div>
   <h1>6:28 ZÓNÁZÓ</h1>
-  <div class="subtitle">VÁC ➜ BUDAPEST-NYUGATI · 2. OSZTÁLY · CSAK ÜLVE</div>
+  <div class="subtitle">VÁC ➜ BUDAPEST-NYUGATI · 2. OSZTÁLY · FEGYENCJÁRAT</div>
 </header>
 
 <div class="status-bar">
@@ -358,7 +398,7 @@
 <div class="main">
   <div class="station-map">
     <div class="station-map-title">▶ ÚTVONAL</div>
-    <div class="stations" id="stationMap"></div>
+    <canvas id="routeCanvas" width="768" height="110" style="width:100%;height:110px;display:block;image-rendering:pixelated;"></canvas>
   </div>
 
   <div class="chat-container">
@@ -384,24 +424,242 @@
 <footer>★ 6:28 ZÓNÁZÓ · VÁC–NYUGATI · MÁV-START Zrt. · PixelRail™ v1.0 ★</footer>
 
 <script>
-const STATIONS = [
-  { name: "Vác" },
-  { name: "Nyugati\nPályaudvar" }
-];
+// ── ANIMATED ROUTE CANVAS ────────────────────────────────────────────────────
+const routeCanvas = document.getElementById('routeCanvas');
+const rctx = routeCanvas.getContext('2d');
+const RW = 768, RH = 110;
+const TRAIN_DURATION = 50000; // 50 seconds
+const trainStartTime = Date.now();
 
-// ── PIXEL TRAIN ──────────────────────────────────────────────────────────────
-function drawTrain() {
+// Landscape segments: type, width (in world units)
+// Types: forest, village, field, town, city
+const LANDSCAPE = [
+  { type: 'forest',  w: 80 },
+  { type: 'field',   w: 60 },
+  { type: 'village', w: 70 },
+  { type: 'forest',  w: 50 },
+  { type: 'field',   w: 80 },
+  { type: 'town',    w: 90 },
+  { type: 'field',   w: 60 },
+  { type: 'forest',  w: 40 },
+  { type: 'city',    w: 120 },
+];
+const TOTAL_WORLD = LANDSCAPE.reduce((s, l) => s + l.w, 0);
+
+// Pregenerate pixel scenery objects
+function seededRand(seed) {
+  let s = seed;
+  return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+}
+
+// Build scenery elements for each segment
+const sceneryObjects = [];
+let wx = 0;
+LANDSCAPE.forEach((seg, si) => {
+  const rng = seededRand(si * 1337 + 42);
+  const count = Math.floor(seg.w / 10) + 2;
+  for (let i = 0; i < count; i++) {
+    const ox = wx + rng() * seg.w;
+    sceneryObjects.push({ type: seg.type, x: ox, seed: rng() });
+  }
+  wx += seg.w;
+});
+
+function drawTree(ctx, x, y, h, rng) {
+  const treeH = 8 + Math.floor(rng * 8);
+  const trunkH = 3;
+  // trunk
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(x, y - trunkH, 2, trunkH);
+  // leaves
+  ctx.fillStyle = rng > 0.5 ? '#2a6a2a' : '#1a5a1a';
+  ctx.fillRect(x - 2, y - trunkH - treeH + 4, 6, treeH - 4);
+  ctx.fillStyle = '#3a8a3a';
+  ctx.fillRect(x - 1, y - trunkH - treeH, 4, 4);
+}
+
+function drawHouse(ctx, x, y, big, rng) {
+  const w = big ? 12 : 8;
+  const h = big ? 10 : 7;
+  // walls
+  ctx.fillStyle = rng > 0.5 ? '#d4b896' : '#c8a882';
+  ctx.fillRect(x, y - h, w, h);
+  // roof
+  ctx.fillStyle = rng > 0.3 ? '#8b2020' : '#6a4a2a';
+  for (let i = 0; i <= w/2; i++) {
+    ctx.fillRect(x + i, y - h - (w/2 - i), w - i*2, 1);
+  }
+  // window
+  ctx.fillStyle = '#aaddff';
+  ctx.fillRect(x + 2, y - h + 2, 3, 3);
+  if (big) ctx.fillRect(x + w - 5, y - h + 2, 3, 3);
+  // door
+  ctx.fillStyle = '#5a3a1a';
+  ctx.fillRect(x + Math.floor(w/2) - 1, y - 4, 3, 4);
+}
+
+function drawBuilding(ctx, x, y, rng) {
+  const w = 10 + Math.floor(rng * 8);
+  const h = 15 + Math.floor(rng * 20);
+  ctx.fillStyle = rng > 0.5 ? '#6a7a8a' : '#7a8a9a';
+  ctx.fillRect(x, y - h, w, h);
+  // windows grid
+  ctx.fillStyle = '#aaddff';
+  for (let wy = y - h + 2; wy < y - 2; wy += 5) {
+    for (let wx2 = x + 2; wx2 < x + w - 2; wx2 += 4) {
+      if (Math.random() > 0.3) ctx.fillRect(wx2, wy, 2, 3);
+    }
+  }
+}
+
+function drawWindmill(ctx, x, y) {
+  ctx.fillStyle = '#d4b896';
+  ctx.fillRect(x, y - 14, 4, 14);
+  ctx.fillStyle = '#8b2020';
+  ctx.fillRect(x - 1, y - 16, 6, 4);
+  // blades
+  ctx.fillStyle = '#d4b896';
+  ctx.fillRect(x + 1, y - 22, 2, 8);
+  ctx.fillRect(x - 4, y - 16, 8, 2);
+}
+
+function drawScene(scrollX) {
+  rctx.clearRect(0, 0, RW, RH);
+
+  // Sky gradient
+  const skyGrad = rctx.createLinearGradient(0, 0, 0, RH * 0.6);
+  skyGrad.addColorStop(0, '#0a0a2a');
+  skyGrad.addColorStop(1, '#1a2a4a');
+  rctx.fillStyle = skyGrad;
+  rctx.fillRect(0, 0, RW, RH * 0.65);
+
+  // Stars (static, pixel)
+  const starSeeds = [17,53,89,123,201,277,331,407,503,601];
+  starSeeds.forEach(s => {
+    const sr = seededRand(s);
+    const sx = (sr() * RW * 3 - scrollX * 0.05) % RW;
+    const sy = sr() * RH * 0.5;
+    rctx.fillStyle = 'rgba(255,255,220,0.8)';
+    rctx.fillRect(Math.abs(sx), sy, 1, 1);
+  });
+
+  // Ground
+  rctx.fillStyle = '#1a2a0a';
+  rctx.fillRect(0, RH * 0.65, RW, RH * 0.35);
+
+  // Ground detail strip
+  rctx.fillStyle = '#2a3a1a';
+  rctx.fillRect(0, RH * 0.65, RW, 3);
+
+  // Rails
+  const railY = Math.floor(RH * 0.72);
+  rctx.fillStyle = '#4a4a6a';
+  rctx.fillRect(0, railY, RW, 3);
+  rctx.fillStyle = '#3a3a5a';
+  rctx.fillRect(0, railY + 4, RW, 3);
+  // Sleepers
+  for (let tx = (-scrollX * 0.3) % 16; tx < RW; tx += 16) {
+    rctx.fillStyle = '#3a2a1a';
+    rctx.fillRect(Math.floor(tx), railY - 1, 4, 9);
+  }
+
+  // Scenery objects (parallax layers)
+  const scaleX = RW / TOTAL_WORLD;
+
+  sceneryObjects.forEach(obj => {
+    const screenX = obj.x * scaleX * 3 - scrollX * 0.8;
+    if (screenX < -30 || screenX > RW + 30) return;
+    const rng = seededRand(Math.floor(obj.seed * 10000));
+    const r = rng();
+
+    const groundY = Math.floor(RH * 0.65);
+
+    switch (obj.type) {
+      case 'forest':
+        drawTree(rctx, screenX, groundY, 12, r);
+        if (r > 0.3) drawTree(rctx, screenX + 6, groundY - 2, 10, r * 0.7);
+        break;
+      case 'village':
+        if (r > 0.4) drawHouse(rctx, screenX, groundY, false, r);
+        else drawTree(rctx, screenX, groundY, 10, r);
+        break;
+      case 'town':
+        if (r > 0.3) drawHouse(rctx, screenX, groundY, true, r);
+        else if (r > 0.1) drawTree(rctx, screenX, groundY, 8, r);
+        else drawWindmill(rctx, screenX, groundY);
+        break;
+      case 'city':
+        if (r > 0.2) drawBuilding(rctx, screenX, groundY, r);
+        else drawHouse(rctx, screenX, groundY, true, r);
+        break;
+      case 'field':
+        // wheat tufts
+        rctx.fillStyle = '#8a7a2a';
+        for (let fi = 0; fi < 3; fi++) {
+          rctx.fillRect(screenX + fi * 4, groundY - 4, 2, 4);
+        }
+        break;
+    }
+  });
+
+  // Station labels
+  const vacX = 20;
+  const nyX = RW - 60;
+  rctx.fillStyle = '#f5c842';
+  rctx.font = '7px "Press Start 2P", monospace';
+  rctx.fillText('VÁC', vacX, RH - 4);
+  rctx.fillText('NYUGATI', nyX - 10, RH - 4);
+
+  // Progress line
+  const progress = Math.min((Date.now() - trainStartTime) / TRAIN_DURATION, 1);
+  const lineY = RH - 14;
+  rctx.fillStyle = '#2a2a5a';
+  rctx.fillRect(vacX + 22, lineY - 1, nyX - vacX - 32, 3);
+  rctx.fillStyle = '#3ac97a';
+  rctx.fillRect(vacX + 22, lineY - 1, (nyX - vacX - 32) * progress, 3);
+
+  // Animated train on progress line
+  const trainLineX = vacX + 22 + (nyX - vacX - 32) * progress;
+  const P2 = 2;
+  const ty = lineY - 8;
+  // train body
+  rctx.fillStyle = '#f5c842';
+  rctx.fillRect(trainLineX - 10, ty, 20, P2);
+  rctx.fillStyle = '#3a6bc9';
+  rctx.fillRect(trainLineX - 10, ty + P2, 20, P2 * 2);
+  rctx.fillStyle = '#f5c842';
+  rctx.fillRect(trainLineX - 10, ty + P2 * 3, 20, P2);
+  // wheels
+  rctx.fillStyle = '#2a2a4a';
+  [-6, 0, 6].forEach(wx3 => rctx.fillRect(trainLineX + wx3, ty + P2 * 4, P2, P2));
+  // front
+  rctx.fillStyle = '#c93a3a';
+  rctx.fillRect(trainLineX + 10, ty + P2, P2, P2 * 2);
+}
+
+// Scroll position: moves across landscape over 50s
+function getScrollX() {
+  const progress = Math.min((Date.now() - trainStartTime) / TRAIN_DURATION, 1);
+  return progress * (TOTAL_WORLD * 3 * 0.768 - RW * 0.5);
+}
+
+function animateRoute() {
+  drawScene(getScrollX());
+  requestAnimationFrame(animateRoute);
+}
+animateRoute();
+
+// ── HEADER TRAIN ─────────────────────────────────────────────────────────────
+function drawHeaderTrain() {
   const canvas = document.getElementById('trainCanvas');
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const P = 4;
   ctx.fillStyle = '#0a0a1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#f5c842';
-  ctx.fillRect(2*P, 7*P, 40*P, P);
-  ctx.fillStyle = '#3a6bc9';
-  ctx.fillRect(2*P, 8*P, 40*P, 4*P);
-  ctx.fillStyle = '#f5c842';
-  ctx.fillRect(2*P, 12*P, 40*P, P);
+  ctx.fillStyle = '#f5c842'; ctx.fillRect(2*P, 7*P, 40*P, P);
+  ctx.fillStyle = '#3a6bc9'; ctx.fillRect(2*P, 8*P, 40*P, 4*P);
+  ctx.fillStyle = '#f5c842'; ctx.fillRect(2*P, 12*P, 40*P, P);
   [[5,13],[12,13],[20,13],[28,13],[35,13]].forEach(([x,y]) => {
     ctx.fillStyle = '#2a2a4a'; ctx.fillRect(x*P, y*P, 2*P, 2*P);
     ctx.fillStyle = '#6a6aaa'; ctx.fillRect(x*P, y*P, P, P);
@@ -422,35 +680,8 @@ function drawTrain() {
     ctx.fillRect((ox - Math.floor(t%3))*P, oy*P, P*2, P*2);
   });
 }
-setInterval(drawTrain, 150);
-drawTrain();
-
-// ── STATIONS ─────────────────────────────────────────────────────────────────
-let currentStationIdx = 0;
-function buildStationMap() {
-  const container = document.getElementById('stationMap');
-  container.innerHTML = '';
-  STATIONS.forEach((s, i) => {
-    const node = document.createElement('div');
-    node.className = 'station-node';
-    const dot = document.createElement('div');
-    dot.className = 'station-dot' + (i < currentStationIdx ? ' passed' : i === currentStationIdx ? ' current' : '');
-    node.appendChild(dot);
-    const name = document.createElement('div');
-    name.className = 'station-name' + (i < currentStationIdx ? ' passed' : i === currentStationIdx ? ' current' : '');
-    name.textContent = s.name;
-    node.appendChild(name);
-    container.appendChild(node);
-    if (i < STATIONS.length - 1) {
-      const line = document.createElement('div');
-      line.className = 'station-line' + (i < currentStationIdx ? ' passed' : '');
-      container.appendChild(line);
-    }
-  });
-}
-buildStationMap();
-
-// ── COUNTDOWN ────────────────────────────────────────────────────────────────
+setInterval(drawHeaderTrain, 150);
+drawHeaderTrain();
 function updateCountdown() {
   const now = new Date();
   const next = new Date();
@@ -462,16 +693,15 @@ function updateCountdown() {
   const s = Math.floor((diff % 60000) / 1000);
   document.getElementById('countdown').textContent =
     h > 0 ? `${h}ó ${String(m).padStart(2,'0')}p` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+  // 🚂 6:28 MOMENT
+  if (now.getHours() === 6 && now.getMinutes() === 28 && now.getSeconds() === 0) {
+    document.getElementById('momentOverlay').classList.add('visible');
+  }
   const depTime = new Date(); depTime.setHours(6, 28, 0, 0);
   const elapsed = (now - depTime) / 60000;
-  const times = [0, 50];
-  let idx = 0;
-  if (elapsed > 0) times.forEach((t,i) => { if (elapsed >= t) idx = i; });
-  if (idx !== currentStationIdx) {
-    currentStationIdx = idx;
-    buildStationMap();
-    document.getElementById('currentStationDisplay').textContent = STATIONS[idx].name.replace('\n', '-');
-  }
+  const stationName = elapsed >= 50 ? 'Nyugati Pályaudvar' : 'Vác';
+  document.getElementById('currentStationDisplay').textContent = stationName;
 }
 updateCountdown();
 setInterval(updateCountdown, 1000);
