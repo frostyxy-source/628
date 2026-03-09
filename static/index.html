@@ -132,6 +132,37 @@
   }
   .moment-train { font-size: 40px; animation: trainBob 0.4s steps(2) infinite; }
 
+  .cert-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92); z-index: 10000;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    text-align: center; padding: 20px;
+  }
+  .cert-overlay.visible { display: flex; }
+  .cert-title { color: var(--yellow); font-size: 12px; line-height: 1.8; text-shadow: 3px 3px 0 #8a6000; }
+  .cert-sub { color: var(--gray); font-size: 7px; line-height: 2; }
+  .cert-inputs { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 300px; }
+  .cert-input {
+    background: var(--bg); border: var(--pixel) solid var(--border);
+    color: var(--white); font-family: 'VT323', monospace;
+    font-size: 18px; padding: 8px 10px; outline: none; text-align: center;
+  }
+  .cert-input:focus { border-color: var(--yellow); }
+  .cert-input::placeholder { color: var(--gray); }
+  .cert-submit {
+    background: var(--yellow); border: none; color: #000;
+    font-family: 'Press Start 2P', monospace; font-size: 8px;
+    padding: 10px; cursor: pointer; box-shadow: var(--pixel) var(--pixel) 0 #8a6000;
+  }
+  .cert-error { color: var(--red); font-size: 7px; display: none; }
+  .cert-error.visible { display: block; }
+  .cert-close {
+    background: transparent; border: var(--pixel) solid var(--gray);
+    color: var(--gray); font-family: 'Press Start 2P', monospace;
+    font-size: 7px; padding: 8px 12px; cursor: pointer; margin-top: 4px;
+  }
+
   .ticker-wrapper {
     width: 100%;
     max-width: 800px;
@@ -176,9 +207,22 @@
     padding: 8px 12px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     border-bottom: var(--pixel) solid var(--border);
   }
+  .chat-titlebar-left { display: flex; align-items: center; gap: 8px; }
+  .cert-btn {
+    background: var(--yellow);
+    border: none; color: #000;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px; padding: 6px 8px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #8a6000;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .cert-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 #8a6000; }
   .chat-titlebar-dot {
     width: 8px; height: 8px;
     background: var(--yellow);
@@ -403,8 +447,11 @@
 
   <div class="chat-container">
     <div class="chat-titlebar">
-      <span class="chat-titlebar-dot"></span>
-      <span>CHAT // 6:28 ZÓNÁZÓ [ÉLŐBEN]</span>
+      <div class="chat-titlebar-left">
+        <span class="chat-titlebar-dot"></span>
+        <span>CHAT // 6:28 ZÓNÁZÓ [ÉLŐBEN]</span>
+      </div>
+      <button class="cert-btn" onclick="document.getElementById('certOverlay').classList.add('visible')">🎫 IGAZOLÁS</button>
     </div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="typing-indicator" id="typingIndicator">
@@ -422,6 +469,19 @@
 </div>
 
 <footer>★ 6:28 ZÓNÁZÓ · VÁC–NYUGATI · MÁV-START Zrt. · PixelRail™ v1.0 ★</footer>
+
+<!-- CERTIFICATE OVERLAY -->
+<div class="cert-overlay" id="certOverlay">
+  <div class="cert-title">🎫 UTAZÁSI IGAZOLÁS</div>
+  <div class="cert-sub">Kérd el a kódot a vonattól a chatben.<br>Aztán add meg a neved.</div>
+  <div class="cert-inputs">
+    <input class="cert-input" id="certName" placeholder="A neved..." maxlength="30"/>
+    <input class="cert-input" id="certCode" placeholder="A titkos kód..." maxlength="20"/>
+    <div class="cert-error" id="certError">❌ Érvénytelen kód. Kérd el a vonattól.</div>
+    <button class="cert-submit" onclick="generateCert()">IGAZOLÁS GENERÁLÁSA ▶</button>
+  </div>
+  <button class="cert-close" onclick="document.getElementById('certOverlay').classList.remove('visible')">VISSZA</button>
+</div>
 
 <script>
 // ── ANIMATED ROUTE CANVAS ────────────────────────────────────────────────────
@@ -797,7 +857,137 @@ async function sendMessage() {
   isThinking = false;
 }
 
-document.getElementById('chatInput').addEventListener('keydown', e => {
+// ── CERTIFICATE GENERATOR ────────────────────────────────────────────────────
+async function generateCert() {
+  const name = document.getElementById('certName').value.trim();
+  const code = document.getElementById('certCode').value.trim();
+  const errEl = document.getElementById('certError');
+  errEl.classList.remove('visible');
+
+  if (!name || !code) { errEl.textContent = '❌ Add meg a neved és a kódot!'; errEl.classList.add('visible'); return; }
+
+  try {
+    const res = await fetch('/api/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, name })
+    });
+    if (!res.ok) { errEl.textContent = '❌ Érvénytelen kód. Kérd el a vonattól.'; errEl.classList.add('visible'); return; }
+
+    document.getElementById('certOverlay').classList.remove('visible');
+    drawCertificate(name);
+  } catch(e) {
+    errEl.textContent = '❌ Hiba. Próbáld újra.'; errEl.classList.add('visible');
+  }
+}
+
+function drawCertificate(name) {
+  const W = 600, H = 380;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Border double pixel
+  ctx.fillStyle = '#f5c842';
+  ctx.fillRect(0, 0, W, 4); ctx.fillRect(0, H-4, W, 4);
+  ctx.fillRect(0, 0, 4, H); ctx.fillRect(W-4, 0, 4, H);
+  ctx.fillStyle = '#8a6000';
+  ctx.fillRect(8, 8, W-16, 2); ctx.fillRect(8, H-10, W-16, 2);
+  ctx.fillRect(8, 8, 2, H-16); ctx.fillRect(W-10, 8, 2, H-16);
+
+  // Corner decorations
+  [[12,12],[W-20,12],[12,H-20],[W-20,H-20]].forEach(([x,y]) => {
+    ctx.fillStyle = '#f5c842';
+    ctx.fillRect(x, y, 8, 8);
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(x+2, y+2, 4, 4);
+  });
+
+  // Header
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 13px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('MÁV-START Zrt.', W/2, 55);
+
+  ctx.fillStyle = '#6a6a9a';
+  ctx.font = '9px "Press Start 2P", monospace';
+  ctx.fillText('HIVATALOS UTAZÁSI IGAZOLÁS', W/2, 80);
+
+  // Train pixel art (small)
+  const P = 3, tx = W/2 - 60, ty = 105;
+  ctx.fillStyle = '#f5c842'; ctx.fillRect(tx, ty, 120, P);
+  ctx.fillStyle = '#3a6bc9'; ctx.fillRect(tx, ty+P, 120, P*3);
+  ctx.fillStyle = '#f5c842'; ctx.fillRect(tx, ty+P*4, 120, P);
+  [15,35,55,75,95].forEach(wx => {
+    ctx.fillStyle = '#2a2a4a'; ctx.fillRect(tx+wx, ty+P*5, P*2, P*2);
+  });
+  [10,25,40,55,70,85,100].forEach(wx => {
+    ctx.fillStyle = '#aadaff'; ctx.fillRect(tx+wx, ty+P, P*2, P*2);
+  });
+  ctx.fillStyle = '#c93a3a'; ctx.fillRect(tx+117, ty+P, P, P*2);
+  ctx.fillStyle = '#0a0a1a';
+  ctx.font = `bold 9px monospace`;
+  ctx.fillText('6:28', tx+45, ty+P*4);
+
+  // Divider
+  ctx.fillStyle = '#2a2a5a';
+  ctx.fillRect(40, 165, W-80, 2);
+
+  // Main text
+  ctx.fillStyle = '#6a6a9a';
+  ctx.font = '8px "Press Start 2P", monospace';
+  ctx.fillText('Igazolom, hogy', W/2, 195);
+
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 16px "Press Start 2P", monospace';
+  ctx.fillText(name.toUpperCase(), W/2, 225);
+
+  ctx.fillStyle = '#e8e8f8';
+  ctx.font = '8px "Press Start 2P", monospace';
+  ctx.fillText('utazott a legendás', W/2, 255);
+
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 12px "Press Start 2P", monospace';
+  ctx.fillText('6:28 ZÓNÁZÓ VONATON', W/2, 278);
+
+  ctx.fillStyle = '#6a6a9a';
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.fillText('VÁC → BUDAPEST-NYUGATI PÁLYAUDVAR', W/2, 300);
+
+  // Date
+  const today = new Date().toLocaleDateString('hu-HU');
+  ctx.fillStyle = '#3a6a3a';
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.fillText(today, W/2, 330);
+
+  // Stamp
+  ctx.strokeStyle = '#c93a3a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(W - 80, H - 80, 35, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#c93a3a';
+  ctx.font = 'bold 7px "Press Start 2P", monospace';
+  ctx.fillText('ÉRVÉNYES', W-80, H-85);
+  ctx.fillText('✓', W-80, H-68);
+
+  // Download
+  const link = document.createElement('a');
+  link.download = `628-igazolas-${name.toLowerCase().replace(/\s+/g,'-')}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+
+  // Also show it
+  canvas.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;border:4px solid #f5c842;max-width:95vw;cursor:pointer;';
+  canvas.title = 'Kattints a bezáráshoz';
+  canvas.onclick = () => document.body.removeChild(canvas);
+  document.body.appendChild(canvas);
+  setTimeout(() => { if (canvas.parentNode) document.body.removeChild(canvas); }, 15000);
+}
   if (e.key === 'Enter') sendMessage();
 });
 
