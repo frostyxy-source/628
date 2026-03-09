@@ -136,7 +136,8 @@ class CodeRequest(BaseModel):
 
 @app.post("/api/verify-code")
 async def verify_code(req: CodeRequest):
-    if req.code.strip().upper() == CERT_CODE.upper():
+    print(f"[CODE CHECK] received='{req.code}' expected='{CERT_CODE}'", flush=True)
+    if req.code.strip().upper() == CERT_CODE.strip().upper():
         return {"valid": True, "name": req.name.strip()}
     raise HTTPException(status_code=403, detail="Érvénytelen kód")
 
