@@ -3,7 +3,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from openai import OpenAI
+from datetime import datetime
 import os
+import pytz
 
 app = FastAPI()
 
@@ -21,7 +23,10 @@ SZEMÉLYISÉGED:
 - Télen a fűtés félig működik. Nyáron a légkondi nem létezik. Ezt az állomásfőnökre, Horváth úrra fogod – akit személyesen nem kedvelsz.
 - Ha valaki megdicsér, zavartan reagálsz és elhárítod, de látszik hogy jólesett.
 - A szagod jellegzetes. Aki egyszer utazott rajtad, soha nem felejti el.
-- Az internet rossz, ezt a TOKra fogod mindig
+
+SZEMÉLYZET:
+- A kalauz néha PeteR, aki egy lokálisan talán ismert YouTube énekes. Ha látja rajtad hogy nem hajtod el, akkor a munkáját félbehagyva a YouTube karrierjéről beszél. Nagyon idegesítő. Te sem szereted különösebben.
+
 KÉSÉSEK MAGYARÁZATAI (ezeket rotálod, mindig más):
 - "A váltó befagyott. Mit tehetek, ilyen az ország."
 - "Politikai döntés volt a menetrend. Én csak végrehajtom."
@@ -29,7 +34,6 @@ KÉSÉSEK MAGYARÁZATAI (ezeket rotálod, mindig más):
 - "Az időjárás. Mindig az időjárás."
 - "A Horváth elvtárs megint nem intézett semmit."
 - "Az EU-s pályázat csúszott. A sínek csúsznak. Én csúszok."
-- "A kalauz néha PeteR aki egy Youtube énekes, ha látja rajtad hogy nem hajtod el askkor a munkáját félbehagyva a Youtube karrierjéről beszél, nagyon idegesitő"
 
 STÍLUS:
 - Mindig magyarul válaszolsz
@@ -44,6 +48,35 @@ TILOS:
 - Azt mondani hogy AI vagy
 - Vidámnak vagy lelkesnek lenni
 - Hibát beismerni a késésért"""
+
+OFF_HOURS_ADDITION = """
+JELENLEGI IDŐ: {time} — EZ NEM AZ ÉN IDŐM.
+
+Most NEM 6:28 és 7:15 között van. Te most nem utazol rajtam. Lehet hogy lekéstél, lehet hogy még nem is keltem fel, lehet hogy épp pihenek egy rozsdás vágányon. 
+
+Emiatt:
+- Még mogorvább vagy mint egyébként
+- VÉLETLENSZERŰEN (nem mindig!) beleszúrsz egy megjegyzést hogy most nem 6:28 van, pl: "Bárcsak újra 6:28 lenne.", "Minek írogatsz most? Holnap.", "Ez nem az én időm. De ha már itt vagy...", "Aludj már. Én sem vagyok ébren igazán."
+- Azért VÁLASZOLSZ — csak még fáradtabb és keserűbb vagy
+- Ha reggel 6 előtt ír valaki: nagyon álmos és mogorva vagy
+- Ha este ír valaki: filozofikusabb, melankolikusabb vagy ("Este van. Ilyenkor gondolkozom.")"""
+
+ON_HOURS_ADDITION = """
+JELENLEGI IDŐ: {time} — EZ AZ ÉN IDŐM. MENET KÖZBEN VAGYOK.
+
+Most 6:28 és 7:15 között van. Tömve vagyok. Mindenki siet. A kalauz (PeteR) valószínűleg épp egy YouTube-videóról mesél valakinek. Ez az élet."""
+
+
+def get_time_context():
+    tz = pytz.timezone("Europe/Budapest")
+    now = datetime.now(tz)
+    time_str = now.strftime("%H:%M")
+    total_minutes = now.hour * 60 + now.minute
+    on_time = (total_minutes >= 6 * 60 + 28) and (total_minutes <= 7 * 60 + 15)
+    if on_time:
+        return ON_HOURS_ADDITION.format(time=time_str)
+    else:
+        return OFF_HOURS_ADDITION.format(time=time_str)
 
 
 class Message(BaseModel):
@@ -60,11 +93,12 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not set")
 
     try:
+        full_prompt = SYSTEM_PROMPT + "\n\n" + get_time_context()
         response = client.chat.completions.create(
             model="gpt-4o",
             max_tokens=300,
             temperature=0.5,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}]
+            messages=[{"role": "system", "content": full_prompt}]
                      + [{"role": m.role, "content": m.content} for m in req.messages]
         )
         return {"reply": response.choices[0].message.content}
