@@ -988,6 +988,8 @@ function drawCertificate(name) {
   document.body.appendChild(canvas);
   setTimeout(() => { if (canvas.parentNode) document.body.removeChild(canvas); }, 15000);
 }
+
+document.getElementById('chatInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') sendMessage();
 });
 
