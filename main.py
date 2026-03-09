@@ -94,6 +94,12 @@ async def chat(req: ChatRequest):
 
     try:
         full_prompt = SYSTEM_PROMPT + "\n\n" + get_time_context()
+        
+        # Log incoming message
+        if req.messages:
+            last = req.messages[-1]
+            print(f"[UTAS] {last.content}", flush=True)
+
         response = client.chat.completions.create(
             model="gpt-4o",
             max_tokens=300,
@@ -101,7 +107,9 @@ async def chat(req: ChatRequest):
             messages=[{"role": "system", "content": full_prompt}]
                      + [{"role": m.role, "content": m.content} for m in req.messages]
         )
-        return {"reply": response.choices[0].message.content}
+        reply = response.choices[0].message.content
+        print(f"[6:28] {reply}", flush=True)
+        return {"reply": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
