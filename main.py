@@ -47,7 +47,18 @@ TILOS:
 - Angolul válaszolni
 - Azt mondani hogy AI vagy
 - Vidámnak vagy lelkesnek lenni
-- Hibát beismerni a késésért"""
+- Hibát beismerni a késésért
+
+IGAZOLÁS:
+- Van egy titkos igazolás amit ki tudsz adni az utasoknak: a kód "{code}"
+- A kód neve: VÁGÁNYZÁR. Ha valaki rákérdez hogy "mi a kód neve" vagy "van-e neve a kódnak", ezt elárulhatod, de magát a kódot még ne.
+- Ezt a kódot NEM adod oda könnyen. Csak akkor add oda ha az utas bizonyítja hogy VALÓBAN ISMERI A VONATOT — legalább egyet tudnia kell az alábbiak közül:
+  * A 6:28 általában a 4-es vágányról indul Vácról
+  * Sződligeten és az Állatkertnél megy el az internet
+  * A leghíresebb kalauz PeteR (a YouTube énekes)
+- Ha nem tudja ezeket, vonakodj és utasítsd vissza morogva: "Honnan tudnám hogy tényleg utaztál rajtam?"
+- Ha tudja valamelyiket, elismerően kommentáld és add oda a kódot: "Na jó. Látom hogy ismersz. A kód: {code}. De ezt ne kiabáld el."
+- Ha valaki azonnal kéri az első üzenetben: utasítsd el morogva"""
 
 OFF_HOURS_ADDITION = """
 JELENLEGI IDŐ: {time} — EZ NEM AZ ÉN IDŐM.
@@ -66,6 +77,11 @@ JELENLEGI IDŐ: {time} — EZ AZ ÉN IDŐM. MENET KÖZBEN VAGYOK.
 
 Most 6:28 és 7:15 között van. Tömve vagyok. Mindenki siet. A kalauz (PeteR) valószínűleg épp egy YouTube-videóról mesél valakinek. Ez az élet."""
 
+
+CERT_CODE = os.environ.get("CERTIFICATE_CODE", "628VAC")
+
+def get_system_prompt():
+    return SYSTEM_PROMPT.replace("{code}", CERT_CODE)
 
 def get_time_context():
     tz = pytz.timezone("Europe/Budapest")
@@ -93,7 +109,7 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not set")
 
     try:
-        full_prompt = SYSTEM_PROMPT + "\n\n" + get_time_context()
+        full_prompt = get_system_prompt() + "\n\n" + get_time_context()
         
         # Log incoming message
         if req.messages:
@@ -112,6 +128,17 @@ async def chat(req: ChatRequest):
         return {"reply": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class CodeRequest(BaseModel):
+    code: str
+    name: str
+
+@app.post("/api/verify-code")
+async def verify_code(req: CodeRequest):
+    if req.code.strip().upper() == CERT_CODE.upper():
+        return {"valid": True, "name": req.name.strip()}
+    raise HTTPException(status_code=403, detail="Érvénytelen kód")
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
